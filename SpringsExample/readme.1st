@@ -1,0 +1,39 @@
+
+По результатам ТИ выдано тестовое задание:
+Создать веб страницу, где будет виден список людей и их городов, и можно будет позволять сохранить этот список в базу данных.
+Технологии: jsp, Spring/EJB, Hibernate, Tomcat, база данных – любая 
+Встречаемся по результатам в четверг 20-го марта
+
+1. Download and unzip Spring Tools Suite ( http://spring.io/tools )
+2. MySql setup
+  a. mysql --host=localhost --user=root --password=root
+  b. CREATE USER 'user1'@'localhost' IDENTIFIED BY 'user1pwd';
+  c. CREATE DATABASE IF NOT EXISTS testdb;
+  d. GRANT ALL privileges ON testdb.* TO user1@localhost;
+  e. USE testdb;
+  f. 
+     CREATE TABLE CITIES
+     (
+         id        INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
+         name      VARCHAR(100) NOT NULL DEFAULT 'empty' ,
+         created   TIMESTAMP DEFAULT NOW()
+     );
+  
+  g.   
+     CREATE TABLE HUMANS
+     (
+         id         INT PRIMARY KEY NOT NULL AUTO_INCREMENT,
+         firstname  VARCHAR(100) NOT NULL DEFAULT 'empty',
+         secondname VARCHAR(100) NOT NULL DEFAULT 'empty',
+         cityid     INT NULL DEFAULT NULL,
+         created    TIMESTAMP DEFAULT NOW(),
+         FOREIGN KEY (cityid) REFERENCES CITIES (id) ON DELETE CASCADE ON UPDATE CASCADE
+     );
+
+     
+http://stackoverflow.com/questions/9416987/spring-form-binding-how-to-do-it-cannot-convert-value-of-type-java-lang-strin
+
+
+1. PropertyEditor
+2. Converter
+
