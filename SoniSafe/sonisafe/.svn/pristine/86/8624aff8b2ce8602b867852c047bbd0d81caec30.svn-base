@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<pre-dex-items>
+
+    <item
+        dex="/home/ptaranov/sonisafe/client/android/sonisafe/app/build/intermediates/pre-dexed/debug/gson-2.2.2-8052911280d3000c0f829a1cf8d719b594a5649d.jar"
+        jar="/home/ptaranov/sonisafe/client/android/sonisafe/app/libs/gson-2.2.2.jar"
+        jumboMode="false"
+        revision="20.0.0"
+        sha1="53bfcd3c8e310d1493b2691484525ed90b04e236"/>
+    <item
+        dex="/home/ptaranov/sonisafe/client/android/sonisafe/app/build/intermediates/pre-dexed/debug/junit-4.11-b98b92b5a402d162b180cc412465817032f57e14.jar"
+        jar="/home/ptaranov/sonisafe/client/android/sonisafe/app/libs/junit-4.11.jar"
+        jumboMode="false"
+        revision="20.0.0"
+        sha1="4e031bb61df09069aeb2bffb4019e7a5034a4ee0"/>
+    <item
+        dex="/home/ptaranov/sonisafe/client/android/sonisafe/app/build/intermediates/pre-dexed/debug/httpclient-android-4.3.5-SNAPSHOT-96a137deca4a917cf3635494db5ee2eae84ce7eb.jar"
+        jar="/home/ptaranov/sonisafe/client/android/sonisafe/app/libs/httpclient-android-4.3.5-SNAPSHOT.jar"
+        jumboMode="false"
+        revision="20.0.0"
+        sha1="775d5360e966831a1a5ae80b6ed5d6b83447dad5"/>
+
+</pre-dex-items>

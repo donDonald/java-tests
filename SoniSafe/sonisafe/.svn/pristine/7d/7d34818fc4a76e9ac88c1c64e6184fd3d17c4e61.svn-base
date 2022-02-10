@@ -1,0 +1,250 @@
+package com.idunno.sonisafe.service;
+
+import android.os.Environment;
+import android.os.MemoryFile;
+
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.conn.params.ConnManagerParams;
+import org.apache.http.entity.ByteArrayEntity;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.params.HttpConnectionParams;
+import org.apache.http.params.HttpParams;
+import org.apache.http.util.EntityUtils;
+
+import com.google.gson.stream.JsonReader;
+import com.google.speech.levelmeter.MicrophoneInput;
+import com.google.speech.levelmeter.MicrophoneInputListener;
+import com.idunno.sonisafe.model.PushSoundResult;
+
+import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.zip.GZIPOutputStream;
+
+public class PushSoundTask implements Runnable, MicrophoneInputListener {
+
+    public PushSoundTask(
+            long index,
+            String url,
+            int captureTimeMs,
+            int sampleFrequency,
+            int bitsPerSample) {
+        m_index = index;
+        m_url = url;
+        m_captureTimeMs = captureTimeMs;
+        m_sampleFrequency = sampleFrequency;
+        m_bitsPerSample = bitsPerSample;
+    }
+
+    public void run() {
+        try {
+            InputStream is = captureMicrophoneInput();
+            //storeToSd( new ByteArrayInputStream(os.toByteArray()) , "sonisafe.wav.zip");
+            byte[] dataToSend = null;
+            if( pushEmptyData() ) {
+                String placeholder = "empty";
+                dataToSend = placeholder.getBytes();
+            } else {
+                ByteArrayOutputStream os = compressMicrophoneInput( is );
+                dataToSend = os.toByteArray();
+            }
+            pushData(dataToSend);
+        } catch (Exception e) {
+            SoniSafeService.returnResult(
+                    m_index,
+                    new ServerError(ServerError.Type.EXCEPTION, e.getMessage()),
+                    null );
+        } finally {
+            m_wavFile.close();
+        }
+    }
+
+    InputStream captureMicrophoneInput() throws InterruptedException, IOException {
+        m_payloadSize = 0;
+        m_samplesToStore = m_sampleFrequency * (m_captureTimeMs/1000);
+        m_wavFile = new MemoryFile(null,m_samplesToStore * (m_bitsPerSample/8) + WAV_HEADER_SIZE );
+        int xz = m_wavFile.length();
+
+        int size = 0; // unknown for now
+        m_wfOffset = 0;
+
+        m_wavFile.writeBytes("RIFF".getBytes(), 0, 0, 4);
+        m_wfOffset += 4;// ChunkID
+
+        m_wavFile.writeBytes(ByteBuffer.allocate(4).putInt( size - 8 ).array(), 0, m_wfOffset, 4);
+        m_wfOffset += 4; // ChunkSize
+
+        m_wavFile.writeBytes("WAVE".getBytes(), 0, m_wfOffset, 4);
+        m_wfOffset += 4; // Format
+
+        m_wavFile.writeBytes("fmt ".getBytes(), 0, m_wfOffset, 4);
+        m_wfOffset += 4; // Subchunk1ID
+
+        m_wavFile.writeBytes(ByteBuffer.allocate(4).putInt(Integer.reverseBytes(16)).array(), 0, m_wfOffset, 4);
+        m_wfOffset += 4; // Subchunk1Size
+
+        m_wavFile.writeBytes(ByteBuffer.allocate(2).putShort(Short.reverseBytes((short) 1)).array(), 0, m_wfOffset, 2);
+        m_wfOffset += 2; // AudioFormat, 1 = PCM
+
+        m_wavFile.writeBytes(ByteBuffer.allocate(2).putShort(Short.reverseBytes( (short)m_channelsNum )).array(), 0, m_wfOffset, 2);
+        m_wfOffset+=2; // NumChannels
+
+        m_wavFile.writeBytes(ByteBuffer.allocate(4).putInt(Integer.reverseBytes(m_sampleFrequency)).array(), 0, m_wfOffset, 4);
+        m_wfOffset+=4; // SampleRate
+
+        m_wavFile.writeBytes(ByteBuffer.allocate(4).putInt(Integer.reverseBytes(m_sampleFrequency * (m_bitsPerSample/8) * m_channelsNum )).array(), 0, m_wfOffset, 4);
+        m_wfOffset+=4; // ByteRate
+
+        m_wavFile.writeBytes(ByteBuffer.allocate(2).putShort(Short.reverseBytes((short) (m_channelsNum * m_bitsPerSample / 8))).array(), 0, m_wfOffset, 2);
+        m_wfOffset+=2; // BlockAlign
+
+        m_wavFile.writeBytes(ByteBuffer.allocate(2).putShort(Short.reverseBytes((short) m_bitsPerSample)).array(), 0, m_wfOffset, 2);
+        m_wfOffset+=2; // BitsPerSample
+
+        m_wavFile.writeBytes("data".getBytes(), 0, m_wfOffset, 4);
+        m_wfOffset+=4; // "data" subchunk
+
+        m_wavFile.writeBytes(ByteBuffer.allocate(4).putInt( size - WAV_HEADER_SIZE ).array(), 0, m_wfOffset, 4);
+        m_wfOffset += 4; // "data" subchunk length
+
+        micInput = new MicrophoneInput( this );
+        micInput.setSampleRate(m_sampleFrequency);
+        micInput.setBps(m_bitsPerSample);
+        micInput.start();
+        micInput.join();
+
+        // Update chunk/sub-chunk sizes
+        int fileSize = m_wavFile.length();
+
+        int subChunk2Length = ( (fileSize-WAV_HEADER_SIZE)/(m_bitsPerSample/8) ) * m_channelsNum * m_bitsPerSample/8;
+        m_wavFile.writeBytes(ByteBuffer.allocate(4).putInt(Integer.reverseBytes(subChunk2Length)).array(), 0, 40, 4);
+        // Subchunk2Size == NumSamples * NumChannels * BitsPerSample/8
+
+        m_wavFile.writeBytes(ByteBuffer.allocate(4).putInt(Integer.reverseBytes(36 + subChunk2Length)).array(), 0, 4, 4);
+        // 36 + SubChunk2Size
+
+        return m_wavFile.getInputStream();
+    }
+
+    private void storeToSd( InputStream input, String fileName ) throws java.io.FileNotFoundException, IOException {
+        FileOutputStream f = new FileOutputStream(
+                new File(Environment.getExternalStorageDirectory(), fileName));
+
+        int len = 0;
+        byte[] buffer = new byte[1024];
+        while ((len = input.read(buffer)) > 0) {
+            f.write(buffer, 0, len);
+        }
+
+        f.close();
+    }
+
+    private ByteArrayOutputStream compressMicrophoneInput( InputStream input ) throws IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        GZIPOutputStream zos = new GZIPOutputStream(new BufferedOutputStream( output ) );
+        int readResult = 0;
+
+        byte[] data = new byte[1024*10];
+        while( ( readResult = input.read(data) ) > 0 ) {
+            zos.write( data, 0, readResult );
+        }
+        zos.close();
+        return output;
+    }
+
+    MicrophoneInput micInput;
+    int             m_samplesToStore;
+    MemoryFile      m_wavFile;
+    int             m_wfOffset;
+    int             m_payloadSize;
+
+    public void processAudioFrame(short[] audioFrame, int numSamples) {
+        try {
+            ByteBuffer buffer = ByteBuffer.allocate(numSamples * (m_bitsPerSample/8));
+            buffer.order(ByteOrder.LITTLE_ENDIAN);
+            buffer.asShortBuffer().put(audioFrame);
+            byte[] b = buffer.array();
+            m_wavFile.writeBytes(b, 0, m_wfOffset, b.length);
+            m_wfOffset+=b.length;
+            if (micInput.totalSamples() >= m_samplesToStore) {
+                micInput.stop();
+            }
+        } catch (Exception e) {
+            assert(false);
+        }
+    }
+
+    private boolean pushEmptyData() throws Exception {
+
+        boolean result = false;
+        HttpClient client = new DefaultHttpClient();
+        HttpParams httpParams = client.getParams();
+        HttpConnectionParams.setConnectionTimeout(httpParams, 20000);
+        HttpConnectionParams.setSoTimeout(httpParams, 20000);
+        ConnManagerParams.setTimeout(httpParams, 20000);
+
+        HttpGet get = new HttpGet( m_url + "/settings_immediate_responce.php");
+        HttpResponse response = client.execute(get);
+        if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
+            String str = EntityUtils.toString( response.getEntity() );
+            result = str.indexOf( "TRUE" ) > 0 ? true : false;
+        } else {
+            throw new ServerError(
+                    ServerError.Type.UNEXPECTED_SERVER_RESPONSE,
+                    "Malformed server response");
+        }
+        return result;
+    }
+
+    private void pushData( byte[] data ) throws Exception {
+        HttpClient client = new DefaultHttpClient();
+        HttpParams httpParams = client.getParams();
+        HttpConnectionParams.setConnectionTimeout(httpParams, 40000);
+        HttpConnectionParams.setSoTimeout(httpParams, 40000);
+        ConnManagerParams.setTimeout(httpParams, 40000);
+
+        HttpPost post = new HttpPost( m_url + "/pushsound.php" );
+        post.addHeader("Content-Type", "image/jpeg"); // Yes, jpeg is byte array as well.
+        post.addHeader("settings-length", Integer.toString( m_captureTimeMs ) );
+        post.addHeader("settings-frequency", Integer.toString( m_sampleFrequency ) );
+        post.setEntity( new ByteArrayEntity( data ) );
+
+        HttpResponse response = client.execute(post);
+        handlePushData( response );
+    }
+
+    private void handlePushData(HttpResponse response) throws IOException{
+        ServerError error = null;
+        ByteBuffer  buffer = null;
+
+        if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
+            //String str = EntityUtils.toString( response.getEntity() );
+            buffer = ByteBuffer.wrap(EntityUtils.toByteArray( response.getEntity()) );
+        } else {
+            error = new ServerError( ServerError.Type.ERROR,
+                                     response.getStatusLine().getReasonPhrase() );
+        }
+
+        SoniSafeService.returnResult(m_index, error, buffer);
+    }
+
+    private final static int WAV_HEADER_SIZE = 44;
+    private long      m_index;
+    private String    m_url;
+    private int       m_captureTimeMs;
+    private int       m_sampleFrequency;
+    private int       m_bitsPerSample;
+    private int       m_channelsNum = 1;
+
+}

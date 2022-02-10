@@ -1,0 +1,22 @@
+<LinearLayout
+    android:id="@+id/layout"
+    android:orientation="vertical"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:background="@drawable/no_text"
+    android:gravity="center|bottom"
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:weightSum="1">
+    <!--android:background="@drawable/no_text"-->
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/button_start"
+        android:id="@+id/button"
+        android:background="@android:color/transparent"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="20pt"
+        android:onClick="onClick" />
+
+</LinearLayout>

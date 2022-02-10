@@ -1,0 +1,40 @@
+package com.idunno.sonisafe.model;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+
+public class Settings {
+
+    public Settings( Context context ) {
+        m_context = context;
+    }
+
+    public String getUrl() {
+        return "http://pavel.sonisafe.com/pushsound.php";
+        //return "http://localhost/html/pushsound.php";
+    }
+
+    public int getCaptureTime() {
+        SharedPreferences prefs =
+                m_context.getSharedPreferences("com.idunno.sonisafe", Context.MODE_PRIVATE);
+        return prefs.getInt( "captureTime", 10 * 1000 );
+    }
+
+    public void setCaptureTime(int captureTime) {
+        SharedPreferences prefs =
+                m_context.getSharedPreferences("com.idunno.sonisafe", Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putInt( "captureTime", captureTime );
+        editor.apply();
+    }
+
+    public int getSampleFrequency() {
+        return 44100;
+    }
+
+    public int getBitsPerSample() {
+        return 2 * 8;
+    }
+
+    private Context m_context;
+}

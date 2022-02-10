@@ -1,0 +1,94 @@
+package com.idunno.sonisafe.model;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+
+public class Settings {
+
+    public Settings( Context context ) {
+        m_context = context;
+    }
+
+    public String getUrl() {
+        //return "http://pavel.sonisafe.com";
+        return "http://pavel.sonisafe.com";
+        //return "http://127.0.0.1/html/pushsound.php";
+        //return "http://localhost/html/pushsound.php";
+    }
+
+    public int getCaptureTime() {
+        SharedPreferences prefs =
+                m_context.getSharedPreferences("com.idunno.sonisafe", Context.MODE_PRIVATE);
+        return prefs.getInt( "captureTime", 10 * 1000 );
+    }
+
+    public void setCaptureTime(int captureTime) {
+        SharedPreferences prefs =
+                m_context.getSharedPreferences("com.idunno.sonisafe", Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putInt( "captureTime", captureTime );
+        editor.apply();
+    }
+
+    public enum SamplingFrequency
+    {
+        F8000(8000),
+        F11025(11025),
+        F22050(22050),
+        F44100(44100);
+
+        public static SamplingFrequency make(int value) {
+            switch(value) {
+                case 8000: return SamplingFrequency.F8000;
+                case 11025: return SamplingFrequency.F11025;
+                case 22050: return SamplingFrequency.F22050;
+                case 44100: return SamplingFrequency.F44100;
+            }
+            return null;
+        }
+
+        SamplingFrequency(int frequency) {
+            m_frequency = frequency;
+        }
+
+        public int getInt() {
+            return m_frequency;
+        }
+
+        public String toString() {
+            return Integer.toString( m_frequency );
+        }
+
+        int m_frequency;
+    }
+
+    public SamplingFrequency getSampleFrequency() {
+        SharedPreferences prefs =
+                m_context.getSharedPreferences("com.idunno.sonisafe", Context.MODE_PRIVATE);
+        int s = prefs.getInt("sampleFrequency", SamplingFrequency.F44100.getInt());
+        return SamplingFrequency.make( s );
+    }
+
+    public void setSampleFrequency( SamplingFrequency samplingFrequency ) {
+        SharedPreferences prefs =
+                m_context.getSharedPreferences("com.idunno.sonisafe", Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putInt("sampleFrequency", samplingFrequency.getInt());
+        editor.apply();
+    }
+
+    static public SamplingFrequency[] getSupportedFrequencies() {
+        SamplingFrequency[] frequencies = new SamplingFrequency[4];
+        frequencies[0] = SamplingFrequency.F8000;
+        frequencies[1] = SamplingFrequency.F11025;
+        frequencies[2] = SamplingFrequency.F22050;
+        frequencies[3] = SamplingFrequency.F44100;
+        return frequencies;
+    }
+
+    public int getBitsPerSample() {
+        return 2 * 8;
+    }
+
+    private Context m_context;
+}

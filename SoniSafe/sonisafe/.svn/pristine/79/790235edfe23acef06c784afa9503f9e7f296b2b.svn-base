@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">Sonisafe</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="action_settings">Settings</string>
+    <string name="title_activity_options">Options</string>
+    <string name="settings_menu">Options</string>
+    <string name="settings_server">Server</string>
+    <string name="settings_length">Sample length</string>
+    <string name="settings_frequency">Frequency, Hz</string>
+    <string name="settings_bps">BPS</string>
+    <string name="button_start">Start</string>
+    <string name="button_sampling">Sampling</string>
+
+</resources>

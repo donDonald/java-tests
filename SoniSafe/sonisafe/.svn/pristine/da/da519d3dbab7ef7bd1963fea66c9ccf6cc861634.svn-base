@@ -1,0 +1,140 @@
+package com.idunno.sonisafe.ui;
+
+import android.app.Activity;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
+import android.graphics.drawable.BitmapDrawable;
+import android.os.Bundle;
+import android.os.IBinder;
+import android.view.Gravity;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.View;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import com.idunno.sonisafe.R;
+import com.idunno.sonisafe.model.PushSound;
+import com.idunno.sonisafe.model.PushSoundResult;
+import com.idunno.sonisafe.model.Settings;
+import com.idunno.sonisafe.service.ServerError;
+import com.idunno.sonisafe.service.SoniSafeService;
+
+import java.nio.ByteBuffer;
+
+
+public class MainActivity extends Activity {
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+/*
+        ((TextView)findViewById(R.id.server_url)).setText(
+                getString(R.string.settings_server) + ":" + Settings.getUrl() );
+
+        ((TextView)findViewById(R.id.audio_length)).setText(
+                getString(R.string.settings_length) + ":" + Settings.getCaptureTime() + " ms");
+
+        ((TextView)findViewById(R.id.audio_frequency)).setText(
+                getString(R.string.settings_frequency) + ":" + Settings.getSampleFrequency() + " KHz" );
+
+        ((TextView)findViewById(R.id.audio_bps)).setText(
+                getString(R.string.settings_bps) + ":" + Settings.getBitsPerSample() + " bits");
+*/
+        m_settings = new Settings( this );
+        m_intent = new Intent(this, SoniSafeService.class);
+        m_serviceConnection = new ServiceConnection() {
+
+            public void onServiceConnected(ComponentName name, IBinder binder) {
+                m_soniSafeService = ((SoniSafeService.SoniSafeServiceBinder)binder).getService();
+                m_isBound = true;
+            }
+
+            public void onServiceDisconnected(ComponentName name) {
+                m_isBound = false;
+            }
+        };
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        bindService(m_intent, m_serviceConnection, Context.BIND_AUTO_CREATE);
+    }
+
+    @Override
+    protected void onPause() {
+        if (m_isBound) {
+            m_isBound = false;
+            unbindService(m_serviceConnection);
+        }
+        super.onPause();
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        //getMenuInflater().inflate(R.menu.main, menu);
+        getMenuInflater().inflate(R.layout.menu, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId())
+        {
+        case R.id.menu_options:
+            Intent intent = new Intent(this, OptionsActivity.class);
+            startActivity(intent);
+            return true;
+        default:
+            return super.onOptionsItemSelected(item);
+        }
+    }
+
+    public void onClick(View view) {
+
+//        ((TextView)findViewById(R.id.result_text)).setText("");
+//        ((TextView)findViewById(R.id.result_v)).setText( "" );
+//        ((TextView)findViewById(R.id.result_t)).setText( "" );
+        ((Button)view).setText(R.string.button_ongoing);
+
+        PushSound.push(
+                m_soniSafeService,
+                this,
+                m_settings.getUrl(),
+                m_settings.getCaptureTime(),
+                m_settings.getSampleFrequency(),
+                m_settings.getBitsPerSample(),
+                new PushSound.Callback() {
+                    @Override
+                    public void onPushComplete(ServerError error, PushSoundResult result) {
+                        ((Button)findViewById(R.id.button)).setText(R.string.button_capture);
+                        if (error == null) {
+                            BitmapDrawable bd = result.isLeveled() ?
+                                    (BitmapDrawable)getResources().getDrawable(R.drawable.yes_text) :
+                                    (BitmapDrawable)getResources().getDrawable(R.drawable.no_text);
+                            ((LinearLayout)findViewById(R.id.layout)).setBackgroundDrawable(bd);
+//                            ((TextView)findViewById(R.id.result_text)).setText( result.getText() );
+//                            ((TextView)findViewById(R.id.result_v)).setText( "Value:" + result.getV() );
+//                            ((TextView)findViewById(R.id.result_t)).setText( "Threshold:" + result.getT() );
+                        } else {
+                            String str = error.toString();
+                            Toast toast = Toast.makeText( getApplicationContext(), str, Toast.LENGTH_LONG );
+                            toast.setGravity( Gravity.CENTER, 0, 0 );
+                            toast.show();
+                        }
+                    }
+                });
+    }
+
+    Intent            m_intent;
+    ServiceConnection m_serviceConnection;
+    SoniSafeService   m_soniSafeService;
+    boolean           m_isBound;
+    Settings          m_settings;
+}

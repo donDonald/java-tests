@@ -1,0 +1,86 @@
+<html>
+<head>
+<title>Admin</title>
+</head>
+<body>
+
+
+<?php
+
+//echo phpinfo();    
+error_reporting(E_ALL);
+//error_reporting(E_ERROR | E_WARNING | E_PARSE);
+error_reporting(E_ERROR | E_PARSE);
+ini_set('display_errors', 'on');
+
+if( FALSE == session_start() ) {
+    die ( "session creation error" );
+}
+
+$shotsFolder = "/var/www/html/audioshots";
+$resultFormUrl = "http://pavel.sonisafe.com/admin.php";
+//$resultFormUrl = "http://localhost/html/admin.php";
+
+if( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
+    if( $_POST['action'] == 'setExpectedResult' ) {
+        setExpectedResult( $_POST[ 'expectedResult' ] );
+    } else if( $_POST['action'] == 'removeAudioShots' ) {
+        removeAudioShots( $_POST[ 'shots' ] );
+    } else {
+        die ( 'unknownmethod' );
+    }
+}
+
+function getExpectedResult() {
+    return file_exists( "./settings/expectedresultyes" );
+}
+
+function setExpectedResult($result) {
+    if( $result == 'TRUE') 
+    {
+        $myfile = fopen("./settings/expectedresultyes", "w") or die("Unable to create file!");
+        fclose( $myfile );
+    } else {
+        unlink( "./settings/expectedresultyes" ); 
+    }
+}
+
+function getAudioShots() {
+    $audioShots = array_diff( scandir( '/var/www/html/audioshots' ), array('..', '.'));
+    foreach(  $audioShots as $shot ) {
+        echo '<input type="checkbox" name="shots[]" value="' . $shot . '">' . $shot . '<br>';
+    }
+}
+
+function removeAudioShots($shots) {
+    foreach( $shots as $shot ) {
+        unlink( '/var/www/html/audioshots/' . $shot );
+    }
+}
+
+?>
+
+<div>Select expected result to be sent upon each request:</div>
+<form name="resut" action=<?php echo $resultFormUrl; ?>  method="POST">
+<div>
+<input type="hidden" name="action" value="setExpectedResult"/>
+<input type="radio" name="expectedResult" value="FALSE" <?php if( FALSE == getExpectedResult() ) { echo 'checked'; } ?>>Failure(red)<br>
+<input type="radio" name="expectedResult" value="TRUE" <?php if( TRUE == getExpectedResult() ) { echo 'checked'; } ?>>Success(green)<br>
+<input type="submit" value="Set">
+</div>
+</form>
+
+
+
+<div>Audio shots:</div>
+<form name="shots" action=<?php echo $resultFormUrl; ?>  method="POST">
+<div>
+<input type="hidden" name="action" value="removeAudioShots"/>
+<?php getAudioShots();  ?>
+<input type="submit" value="Remove selections">
+</div>
+</form>
+
+
+</body>
+</html>
